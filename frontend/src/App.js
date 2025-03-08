@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 // DinoGame 컴포넌트
-function DinoGame({ position, shouldJump }) {
+function DinoGame({ position, shouldJump, color }) {
   const [dinoY, setDinoY] = useState(position);
 
   useEffect(() => {
@@ -17,17 +17,18 @@ function DinoGame({ position, shouldJump }) {
     <div style={{
       position: "relative",
       width: "960px",
-      height: "200px",
-      border: "2px solid black",
+      height: "180px",
+      border: "4px solid " + color,
       margin: "20px",
-      backgroundColor: "#f0f0f0"
+      backgroundColor: "#f0f0f0",
+      boxShadow: `0 0 10px ${color}`
     }}>
       <img 
         src={require("./images/dino.png")} 
         alt="dino" 
         style={{ 
           position: "absolute", 
-          top: dinoY - position + 100, // 상대적인 위치로 변경
+          top: dinoY - position + 130,
           left: 100,
           transition: "top 0.5s",
           width: "50px",
@@ -42,6 +43,7 @@ function DinoGame({ position, shouldJump }) {
 function App() {
   const [ws, setWs] = useState(null);
   const [jumpingPlayer, setJumpingPlayer] = useState(null);
+  const [canJump, setCanJump] = useState(true);
 
   useEffect(() => {
     const socket = new WebSocket("ws://localhost:8080/ws");
@@ -70,8 +72,13 @@ function App() {
   // 스페이스바 이벤트 관리
   useEffect(() => {
     const handleKeyPress = (event) => {
-      if (event.code === "Space") {
+      if (event.code === "Space" && canJump) {
         sendMessage();
+        setCanJump(false);
+
+        setTimeout(() => {
+          setCanJump(true);
+        }, 500);
       }
     };
 
@@ -80,7 +87,7 @@ function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyPress);
     };
-  }, [ws]);
+  }, [ws, canJump]);
 
   const sendMessage = () => {
     if (ws) {
@@ -91,10 +98,26 @@ function App() {
 
   return (
     <div>
-      <DinoGame position={200} shouldJump={jumpingPlayer === 0} />
-      <DinoGame position={400} shouldJump={jumpingPlayer === 1} />
-      <DinoGame position={600} shouldJump={jumpingPlayer === 2} />
-      <DinoGame position={800} shouldJump={jumpingPlayer === 3} />
+      <DinoGame 
+        position={200} 
+        shouldJump={jumpingPlayer === 0} 
+        color="#ff3333"
+      />
+      <DinoGame 
+        position={400} 
+        shouldJump={jumpingPlayer === 1} 
+        color="#3333ff"
+      />
+      <DinoGame 
+        position={600} 
+        shouldJump={jumpingPlayer === 2} 
+        color="#33ff33"
+      />
+      <DinoGame 
+        position={800} 
+        shouldJump={jumpingPlayer === 3} 
+        color="#ffff33"
+      />
     </div>
   );
 }
