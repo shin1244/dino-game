@@ -4,22 +4,31 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
+type Message struct {
+	Type   string `json:"type"`
+	Caster int    `json:"caster"`
+	Target int    `json:"target"`
+}
+
 var upgrader = websocket.Upgrader{
-	// 개발 환경을 위해 모든 도메인 허용
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
 }
 
-// 모든 웹소켓 연결을 저장하는 맵
-var clients = make(map[*websocket.Conn]int)
+var (
+	clients = make(map[*websocket.Conn]int)
+	jumping sync.Map // sync.Map 사용
+	spawn   sync.Map // sync.Map 사용
+)
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	// 웹소켓 연결 수립
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Failed to upgrade to WebSocket:", err)
@@ -36,17 +45,46 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	defer delete(clients, conn)
 	defer conn.Close()
 
-	// 메시지 수신 및 에코
+	conn.WriteJSON(Message{
+		Type:   "join",
+		Caster: num,
+	})
+
 	for {
-		// 메시지 읽기
-		_, _, err := conn.ReadMessage()
+		var message Message
+		err := conn.ReadJSON(&message)
 		if err != nil {
 			log.Println("Error reading message:", err)
 			break
 		}
-		fmt.Println("Received message:", clients[conn])
+		if message.Type == "jump" {
+			// Load로 현재 점프 상태 확인
+			if isJumping, exists := jumping.Load(message.Caster); !exists || !isJumping.(bool) {
+				// Store로 점프 상태 저장
+				jumping.Store(message.Caster, true)
+				broadcastMessage(message)
 
-		broadcastMessage(clients[conn])
+				go func(playerNum int) {
+					time.Sleep(time.Millisecond * 800)
+					jumping.Store(playerNum, false)
+				}(message.Caster)
+				continue
+			}
+		}
+		if message.Type == "spawn" {
+			// Load로 현재 생성 상태 확인
+			if isSpawned, exists := spawn.Load(message.Caster); !exists || !isSpawned.(bool) {
+				// Store로 생성 상태 저장
+				spawn.Store(message.Caster, true)
+				broadcastMessage(message)
+
+				go func(playerNum int) {
+					time.Sleep(time.Millisecond * 100)
+					spawn.Store(playerNum, false)
+				}(message.Caster)
+				continue
+			}
+		}
 	}
 }
 
@@ -67,9 +105,9 @@ func joinClient(conn *websocket.Conn) int {
 	return -1
 }
 
-func broadcastMessage(message int) {
+func broadcastMessage(message Message) {
 	for conn := range clients {
-		conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%d", message)))
+		conn.WriteJSON(message)
 	}
 }
 
