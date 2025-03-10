@@ -1,20 +1,34 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
+import { SheepManager } from './sprites/SheepManager';
 
 function Game() {
   const canvasRef = useRef(null);
+  const sheepManagerRef = useRef(null);
   const { sendMessage, message } = useWebSocket('ws://localhost:8080/ws');
   const [isHunter, setIsHunter] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    sheepManagerRef.current = new SheepManager();
+  }, []);
 
   useEffect(() => {
     if (message) {
       switch (message.type) {
         case 'gameStart':
           setIsHunter(message.data);
+          if (message.sheeps) {
+            Object.values(message.sheeps).forEach(sheep => {
+              sheepManagerRef.current.addSheep(sheep.id, sheep.x, sheep.y);
+            });
+          }
           break;
         case 'mouseMove':
           setMousePos({ x: message.x, y: message.y });
+          break;
+        case 'sheepMove':
+          sheepManagerRef.current.updateSheep(message.id, message.x, message.y, message.direction);
           break;
       }
     }
@@ -37,13 +51,13 @@ function Game() {
 
     const handleKeyDown = (e) => {
       if (e.key === "ArrowUp") {
-        sendMessage({ type: 'move', direction: 'up' });
+        sendMessage({ type: 'sheepMove', direction: 'up' });
       } else if (e.key === "ArrowDown") {
-        sendMessage({ type: 'move', direction: 'down' });
+        sendMessage({ type: 'sheepMove', direction: 'down' });
       } else if (e.key === "ArrowLeft") {
-        sendMessage({ type: 'move', direction: 'left' });
+        sendMessage({ type: 'sheepMove', direction: 'left' });
       } else if (e.key === "ArrowRight") {
-        sendMessage({ type: 'move', direction: 'right' });
+        sendMessage({ type: 'sheepMove', direction: 'right' });
       }
     } 
 
@@ -64,6 +78,8 @@ function Game() {
       ctx.fillStyle = 'red';
       ctx.fill();
 
+      sheepManagerRef.current.drawAll(ctx);
+
       requestAnimationFrame(gameLoop);
     }
 
@@ -73,7 +89,7 @@ function Game() {
       canvas.removeEventListener('mousemove', handleMouseMove);
       canvas.removeEventListener('keydown', handleKeyDown);
     };
-  }, [mousePos, sendMessage]);
+  }, [mousePos, sendMessage, sheepManagerRef]);
 
   return (
     <canvas 

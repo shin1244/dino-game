@@ -9,17 +9,18 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type Player struct {
-	isHunter bool    `json:"is_hunter"`
-	x        float64 `json:"x"`
-	y        float64 `json:"y"`
+type Sheep struct {
+	Id int     `json:"id"`
+	X  float64 `json:"x"`
+	Y  float64 `json:"y"`
 }
 
 type Message struct {
-	Type string  `json:"type"`
-	X    float64 `json:"x"`
-	Y    float64 `json:"y"`
-	Data bool    `json:"data"`
+	Type   string        `json:"type"`
+	X      float64       `json:"x"`
+	Y      float64       `json:"y"`
+	Data   bool          `json:"data"`
+	Sheeps map[int]Sheep `json:"sheeps"`
 }
 
 var upgrader = websocket.Upgrader{
@@ -28,6 +29,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+var sheeps = make(map[int]Sheep)
 var clients = make(map[*websocket.Conn]int)
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -85,16 +87,26 @@ func broadcastMessage(message Message) {
 func gameStart() {
 	isHunter := rand.Intn(2)
 
+	for i := 0; i < 10; i++ {
+		sheeps[i] = Sheep{
+			Id: i,
+			X:  float64(rand.Intn(960)),
+			Y:  float64(rand.Intn(960)),
+		}
+	}
+
 	for conn, num := range clients {
 		if num == isHunter {
 			conn.WriteJSON(Message{
-				Type: "gameStart",
-				Data: true,
+				Type:   "gameStart",
+				Data:   true,
+				Sheeps: sheeps,
 			})
 		} else {
 			conn.WriteJSON(Message{
-				Type: "gameStart",
-				Data: false,
+				Type:   "gameStart",
+				Data:   false,
+				Sheeps: sheeps,
 			})
 		}
 	}
